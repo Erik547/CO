@@ -68,10 +68,10 @@ loop:						# prints the character received in rsi the number of times received i
     cmpq $0, %rdi			# compares if there are any more prints left to do
     jle brek				# if less or equal jumps to brek
 
-	pushq %rsi				# pushes the value in %rsi to store it, printf changes values in registers
-	pushq %rdi				# pushes the value in %rdi to store it, printf changes values in registers
-	pushq %rdx				# second byte
-	pushq %rcx				# first byte
+	pushq %rsi				# push %rsi (character that we print)
+	pushq %rdi				# push %rdi (number of times we print)
+	pushq %rdx				# push %rdx  (foreground color)
+	pushq %rcx				# push %rcx   (background color)
 
 	cmpq %rcx, %rdx			# compares if the colors are the same or not
 	jne printing			# if not it jumps to printing label to print them normally
@@ -89,7 +89,7 @@ loop:						# prints the character received in rsi the number of times received i
 	je faint1				# if the value in rdx is 66 it jumps to faint to print the text faint
 
 	cmpq $105, %rdx
-	je conceal1				# if the value in rdx is 105 it jumps to conceal to conceal/hide the text
+	je conceal1				# if the value in rdx is 105 it jumps to conceal to conceal the text
 
 	cmpq $153, %rdx
 	je reveal1				# if the value in rdx is 153 it jumps to reveal to reveal the text
@@ -105,10 +105,9 @@ printing:
 
 	addq $8, %rsp
 	popq %rsi				# pops the text color value off the stack in rsi
-	subq $16, %rsp			# alligns the stack
 
-	addq $24, %rsp
-	popq %rdx				# pops the character value off the stack in rdx second argument for printf
+	addq $8, %rsp 			# alligns the stack
+	popq %rdx				# pops the character value off the stack in rdx third argument for printf
 	subq $32, %rsp			# alligns the stack
 
     movq $foreground, %rdi	# moves the print format to %rdi
@@ -128,19 +127,22 @@ printing:
     movq	%rbp, %rsp		# clear local variables from stack
 	popq	%rbp			# restore base pointer location 
 	ret						# pops the return address off the stack and jumps to it
-brek2:
+
+brek2: # used to reset color before exiting the program
 	call reset				# calls reset so the terminal will reset
 	movq	%rbp, %rsp		# clear local variables from stack
 	popq	%rbp			# restore base pointer location 
 	ret						# pops the return address off the stack and jumps to it
 
-brek:						# executes epilogue and return in recursive subroutines decode and loop
+brek: # executes epilogue and return in recursive subroutines decode and loop
     movq	%rbp, %rsp		# clear local variables from stack
 	popq	%rbp			# restore base pointer location 
 	ret						# pops the return value off the stack and jumps to it
+
 reset1:
 	call reset				# calls reset
 	jmp printing			# jumps to printing
+
 stopblinking:
 	addq $24, %rsp
 	popq %rsi				# pops the character to be printed from the stack
@@ -282,8 +284,8 @@ decode2:
 	pushq %rsi				# stores the MESSAGE address in the stack
 	
 
-	movq (%rdi), %r8		# move the value located at %rdi to %r8
-	movq $0, %rsi			# clear any values stored in %rsi
+	movq (%rdi), %r8		# move the value located at %rdi to %r8 (the .quad from message)
+	movq $0, %rsi			# clear any values stored in %rsi 
 	movb %r8b, %sil			# move a byte from %r8b to %sil, second argument for loop, the character to be printed
 	shr $8, %r8				# shifting the value in %r8 to the right with 8 bits
 
@@ -292,13 +294,13 @@ decode2:
     shr $8, %r8				# shift the value in %r8 to the right with 8 bits
 
 	movq $0, %r10			# clear any values stored in %r10
-	movl %r8d, %r10d		# move 4 bytes from %r8d to %r10d
+	movl %r8d, %r10d		# move 4 bytes from %r8d to %r10d (next memory block we will jump to)
 	pushq %r10				# push the value in r10 to store it
 
-	cmpl $0, %r8d			# compares if the next memory address is at line 0 in the message
-	je brek2				# if equal it jumps to brek
+	cmpl $0, %r8d			# compares if the next memory address is 0
+	je brek2				# if equal it jumps to brek2
 	
-	shr $32, %r8			# shifts 8 bits to the right
+	shr $32, %r8			# shifts 32 bits to the right
 	movq $0, %rdx
 	movb %r8b, %dl			# moves the text color to dl
 
@@ -309,8 +311,8 @@ decode2:
 	call loop				# calls loop to print the character
 
 	movq $0, %r8			# clear any values stored in %r8
-	popq %r8				# pop the remaining value from the stack int %r8
-	movq $0, %rax
+	popq %r8				# pop the next memory block we will jump to from the stack in %r8
+	movq $0, %rax 			# clear %rax
 	movl %r8d, %eax			# moving 4 bytes from %r8 to %rax
 	movq $8, %r8			# move the value 8 in %r8
 	mulq %r8				# multiply the value in %rax with the value in %r8(8) to obtain the offset added to $MESSAGE

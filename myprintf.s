@@ -1,5 +1,5 @@
 .text #message format string
-message: .asciz "%s %% %u %r hello bro woo %s %d %d %u %%hello lol\n"
+message: .asciz "%s %% %u %r hello bro woo %s %d %d %u %s %%hello lol\n"
 
 #additional strings for %s format specifier
 string: .asciz "Piet"
@@ -11,6 +11,13 @@ my_printf:
 	# prologue
 	pushq %rbp 			# push the base pointer (and align the stack)
 	movq %rsp, %rbp		# copy stack pointer value to base pointer
+	
+	#push the values of the calle-saved registers to the stack
+	pushq %r12  			#push %r12
+	pushq %r13				#push %r13
+	pushq %r14 				#push %r14
+	pushq %r15 				#push %r15
+	pushq %rbx 				#push %rbx
 
 	movq %rdi, %r12     #message in %r12
 	movq $0, %r13  		#start of message
@@ -22,7 +29,7 @@ test_if_more_arguments:
 
 	pushloop:
 		movq %rbp, %r15   #move the value of the base pointer to %r15
-		addq $24, %r15    #add 24 bytes to jump over %rbp, the return value and %rsi (pushed earlier in main)
+		addq $16, %r15    #add 16 bytes to jump over %rbp, the return value and %rsi (pushed earlier in main)
 
 	pushloop2:
 		pushq (%r15)      #push the value found at %r15 to stack
@@ -64,6 +71,13 @@ continue:
 
 	cmpb $0, %r14b 				#check if %r14 contains 0x00 (end of message)
 	jne loop 					#if not, jump to loop again to print the next character
+
+	#restore the values of the calle-saved registers from the stack
+	popq %rbx 				#pop %rbx
+	popq %r15 				#pop %r15
+	popq %r14  				#pop %r14
+	popq %r13				#pop %r13
+	popq %r12 				#pop %r12
 
 	# epilogue
 	movq %rbp, %rsp		# clear local variables from stack
@@ -172,12 +186,6 @@ digitchar: # number in %rdi , number of digits in %rbx
 main:
 	pushq %rbp 				# push the base pointer (and align the stack)
 	movq %rsp, %rbp			# copy stack pointer value to base pointer
-	#push the values of the calle-saved registers to the stack
-	pushq %r12  			#push %r12
-	pushq %r13				#push %r13
-	pushq %r14 				#push %r14
-	pushq %r15 				#push %r15
-	pushq %rbx 				#push %rbx
 
 	#optional arguments, used for format specifier, values can be changed or omitted if not needed(comment the lines)
 	movq $string2, %rdx  	#%s test value
@@ -186,27 +194,15 @@ main:
 	movq $-42, %r9 			#%d test value
 	pushq $-123472941  		#additional argument in stack
 	pushq $1727  			#additional argument in stack
-	//pushq $string2  
+	pushq $string2  
 	//pushq $9292
 	//pushq $123
     
-    movq $2, %rsi  			#number of additional parameteres in stack, second parameter for my_printf
-    pushq %rsi  			#push %rsi to the stack, used later for restoring the calle-saved registers
+    movq $3, %rsi  			#number of additional parameteres in stack, second parameter for my_printf
 	movq $message, %rdi  	#first parameter, message in %rdi
 	call my_printf			#call myprintf, takes 2 arguments, message format in %rdi and number of 
 							#additional arguments in stack in %rsi (can be 0 or more based on how many
 							#format specifiers are provided in message)
-
-	popq %rsi  				#pop the value of additional parameters in %rsi
-	movq $8, %rax 			#move 8 to %rax 
-	mulq %rsi 				#multiply %rsi*8
-	addq %rax, %rsp 		#move rsp to the calle-saved registers location on stack
-	#restore the values of the calle-saved registers from the stack
-	popq %rbx 				#pop %rbx
-	popq %r15 				#pop %r15
-	popq %r14  				#pop %r14
-	popq %r13				#pop %r13
-	popq %r12 				#pop %r12
 
 	popq %rbp				# restore base pointer location 
 	movq $0, %rdi			# load program exit code
